@@ -10,7 +10,10 @@ if (! (bool) config('fsa-sso.web_routes_enabled', true)) {
     return;
 }
 
-$middleware = (array) config('fsa-sso.web_route_middleware', ['web']);
+$middleware = array_values(array_filter(array_merge(
+    (array) config('fsa-sso.web_route_middleware', ['web']),
+    [(string) config('fsa-sso.web_throttle_middleware', 'throttle:30,1')],
+), static fn (mixed $value): bool => is_string($value) && $value !== ''));
 $loginPath = ltrim((string) config('fsa-sso.web_login_path', 'fsa-sso/loginUrl'), '/');
 $callbackPath = ltrim((string) config('fsa-sso.web_callback_path', 'sso/callback-success'), '/');
 $fallbackCallbackPath = ltrim((string) config('fsa-sso.web_fallback_callback_path', 'fsa-sso/callback'), '/');

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PutheaKhem\FsaSso\Services;
 
+use Exception;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -98,7 +99,11 @@ final class FsaSsoTokenVerifier
         $cacheKey = 'fsa-sso:jwks:'.md5($jwksUrl);
 
         $jwks = Cache::remember($cacheKey, now()->addSeconds($ttl), function () use ($jwksUrl): array {
-            $response = Http::acceptJson()->timeout(10)->connectTimeout(5)->get($jwksUrl);
+            $response = Http::acceptJson()
+                ->timeout(10)
+                ->connectTimeout(5)
+                ->retry(3, fn (int $attempt, Exception $exception): int => $attempt * 200)
+                ->get($jwksUrl);
             $response->throw();
 
             $json = $response->json();

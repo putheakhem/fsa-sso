@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PutheaKhem\FsaSso\Http\Controllers;
 
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use PutheaKhem\FsaSso\Services\FsaSsoManager;
@@ -25,10 +26,18 @@ final class SsoIntrospectController
 
         try {
             return response()->json($this->manager->introspect($token));
-        } catch (Throwable) {
+        } catch (RequestException $exception) {
+            report($exception);
+
             return response()->json([
                 'active' => false,
-            ]);
+            ], 502);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return response()->json([
+                'active' => false,
+            ], 500);
         }
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PutheaKhem\FsaSso\Http\Controllers;
 
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use PutheaKhem\FsaSso\Services\FsaSsoManager;
@@ -27,10 +28,18 @@ final class SsoRevokeController
             $this->manager->revoke($token);
 
             return response()->json([], 204);
-        } catch (Throwable) {
+        } catch (RequestException $exception) {
+            report($exception);
+
             return response()->json([
                 'message' => 'Unable to revoke token.',
             ], 502);
+        } catch (Throwable $exception) {
+            report($exception);
+
+            return response()->json([
+                'message' => 'Unable to revoke token.',
+            ], 500);
         }
     }
 }

@@ -8,7 +8,12 @@ use PutheaKhem\FsaSso\Http\Controllers\SsoIntrospectController;
 use PutheaKhem\FsaSso\Http\Controllers\SsoRevokeController;
 use PutheaKhem\FsaSso\Http\Controllers\SsoVerifyController;
 
-Route::middleware((array) config('fsa-sso.route_middleware', ['api']))
+$middleware = array_values(array_filter(array_merge(
+    (array) config('fsa-sso.route_middleware', ['api']),
+    [(string) config('fsa-sso.api_throttle_middleware', 'throttle:30,1')],
+), static fn (mixed $value): bool => is_string($value) && $value !== ''));
+
+Route::middleware($middleware)
     ->prefix((string) config('fsa-sso.route_prefix', 'auth/sso'))
     ->group(function (): void {
     Route::get('/initiate', SsoInitiateController::class)->name('fsa-sso.initiate');

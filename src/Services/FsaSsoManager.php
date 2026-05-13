@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PutheaKhem\FsaSso\Services;
 
+use Exception;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
@@ -63,6 +64,7 @@ final class FsaSsoManager
         $response = Http::acceptJson()
             ->timeout(10)
             ->connectTimeout(5)
+            ->retry(3, fn (int $attempt, Exception $exception): int => $attempt * 200)
             ->withToken($token)
             ->post($baseUrl.'/api/v1/auth/introspect', [
                 'token' => $token,
@@ -84,6 +86,7 @@ final class FsaSsoManager
         Http::acceptJson()
             ->timeout(10)
             ->connectTimeout(5)
+            ->retry(3, fn (int $attempt, Exception $exception): int => $attempt * 200)
             ->withToken($token)
             ->post($baseUrl.'/api/v1/auth/revoke')
             ->throw();

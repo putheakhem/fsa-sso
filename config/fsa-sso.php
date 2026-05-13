@@ -6,9 +6,11 @@ return [
     'route_prefix' => env('FSA_SSO_ROUTE_PREFIX', 'auth/sso'),
 
     'route_middleware' => ['api'],
+    'api_throttle_middleware' => env('FSA_SSO_API_THROTTLE_MIDDLEWARE', 'throttle:30,1'),
 
     'web_routes_enabled' => (bool) env('FSA_SSO_ENABLE_WEB_ROUTES', true),
     'web_route_middleware' => ['web'],
+    'web_throttle_middleware' => env('FSA_SSO_WEB_THROTTLE_MIDDLEWARE', 'throttle:30,1'),
     'web_login_path' => env('FSA_SSO_WEB_LOGIN_PATH', 'fsa-sso/loginUrl'),
     'web_callback_path' => env('FSA_SSO_WEB_CALLBACK_PATH', 'sso/callback-success'),
     'web_fallback_callback_path' => env('FSA_SSO_WEB_FALLBACK_CALLBACK_PATH', 'fsa-sso/callback'),

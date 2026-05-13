@@ -9,6 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
+use PutheaKhem\FsaSso\Exceptions\FsaSsoTokenException;
 use Throwable;
 use PutheaKhem\FsaSso\Services\FsaSsoManager;
 
@@ -41,8 +42,14 @@ final class SsoWebCallbackController
             }
 
             return redirect()->intended('/');
+        } catch (FsaSsoTokenException $exception) {
+            report($exception);
+
+            return $this->failureResponse($request, 'Authentication failed', 401);
         } catch (Throwable $exception) {
-            return $this->failureResponse($request, 'Authentication failed: '.$exception->getMessage(), 401);
+            report($exception);
+
+            return $this->failureResponse($request, 'Authentication failed', 500);
         }
     }
 
