@@ -35,13 +35,19 @@ final class FsaSsoServiceProvider extends ServiceProvider
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
 
         if ($this->app->runningInConsole()) {
-            $this->publishes([
+            $publishableConfig = [
                 __DIR__.'/../config/fsa-sso.php' => config_path('fsa-sso.php'),
-            ], 'fsa-sso-config');
+            ];
 
-            $this->publishesMigrations([
-                __DIR__.'/../database/migrations' => database_path('migrations'),
-            ], 'fsa-sso-migrations');
+            $publishableMigrations = [
+                __DIR__.'/../database/migrations/' => database_path('migrations'),
+            ];
+
+            $this->publishes($publishableConfig, 'fsa-sso-config');
+            $this->publishes($publishableConfig, 'config');
+
+            $this->publishes($publishableMigrations, 'fsa-sso-migrations');
+            $this->publishes($publishableMigrations, 'migrations');
         }
     }
 }

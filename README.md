@@ -47,6 +47,15 @@ php artisan vendor:publish --tag=fsa-sso-migrations
 php artisan migrate
 ```
 
+If your app has many packages and tag-based publish does not detect resources, use provider-scoped commands:
+
+```bash
+php artisan vendor:publish --provider="PutheaKhem\\FsaSso\\FsaSsoServiceProvider" --tag=fsa-sso-config
+php artisan vendor:publish --provider="PutheaKhem\\FsaSso\\FsaSsoServiceProvider" --tag=fsa-sso-migrations
+```
+
+The package also registers conventional `config` and `migrations` tags for compatibility.
+
 ---
 
 ## 🌐 .env Configuration
