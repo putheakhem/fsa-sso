@@ -78,7 +78,7 @@ FSA_SSO_ROUTE_PREFIX=auth/sso
 FSA_SSO_JWKS_CACHE_TTL_SECONDS=600
 FSA_SSO_RETURN_ACCESS_TOKEN=false
 FSA_SSO_INCLUDE_CLAIMS_IN_RESPONSE=true
-FSA_SSO_USER_MODEL=App\\Models\\User
+FSA_SSO_USER_MODEL=App\Models\User
 
 # Optional package-managed web flow
 FSA_SSO_ENABLE_WEB_ROUTES=true
@@ -94,6 +94,8 @@ FSA_SSO_WEB_FAILURE_REDIRECT=/login
 ```
 
 > ✅ `FSA_SSO_CLIENT_CODE` must exactly match the client code registered in the FSA SSO admin portal.
+
+> ✅ Use single backslashes for `FSA_SSO_USER_MODEL` in `.env` (example: `App\Models\User`).
 
 ---
 
@@ -185,7 +187,7 @@ Notes:
 - Callback URL must match exactly between your app env config and FSA admin configuration.
 - Keep a distinct `FSA_SSO_CLIENT_CODE` per application if required by your FSA SSO setup.
 
-### Step 2 — Pass the Package Login Route to Your Login Page (Inertia)
+### Step 2 — Confirm the Login Page Is Rendered by Inertia
 
 ```php
 // app/Http/Controllers/Auth/AuthenticatedSessionController.php
@@ -195,7 +197,6 @@ public function create(): Response
     return Inertia::render('auth/login', [
         'canResetPassword' => Route::has('password.request'),
         'canRegister'      => Route::has('register'),
-        'fsaSsoLoginUrl'   => route('fsaSsoLoginUrl', absolute: false),
         'status'           => session('status'),
     ]);
 }
@@ -203,17 +204,20 @@ public function create(): Response
 
 ### Step 3 — Add the "Sign in with FSA SSO" Button (React / Inertia)
 
+Use the generated Wayfinder route helper from `@/routes`. Call `.url()` when assigning it to a native `<a href>`.
+
 ```tsx
 // resources/js/pages/auth/login.tsx
+
+import { fsaSsoLoginUrl } from '@/routes';
 
 interface LoginProps {
     status?: string;
     canResetPassword: boolean;
     canRegister: boolean;
-    fsaSsoLoginUrl: string;
 }
 
-export default function Login({ status, canResetPassword, canRegister, fsaSsoLoginUrl }: LoginProps) {
+export default function Login({ status, canResetPassword, canRegister }: LoginProps) {
     return (
         <AuthLayout title="Log in to your account" description="Enter your credentials to log in">
             <Form ...>
@@ -226,7 +230,7 @@ export default function Login({ status, canResetPassword, canRegister, fsaSsoLog
                         </div>
 
                         <Button type="button" variant="outline" className="w-full" asChild>
-                            <a href={fsaSsoLoginUrl}>Sign in with FSA SSO</a>
+                            <a href={fsaSsoLoginUrl.url()}>Sign in with FSA SSO</a>
                         </Button>
                     </>
                 )}
@@ -370,6 +374,7 @@ All options are in `config/fsa-sso.php` after publishing:
 | Callback route is not available | Package web routes were disabled | Set `FSA_SSO_ENABLE_WEB_ROUTES=true` or register your own routes/controllers |
 | Login URL not working | Wrong URL format | Correct: `/auth/login?client_code=...` |
 | Client code mismatch | Env vs portal mismatch | `FSA_SSO_CLIENT_CODE` must match FSA admin exactly |
+| Redirects back to login after callback | Invalid user model class value (often double-escaped in `.env`) | Set `FSA_SSO_USER_MODEL=App\Models\User` and clear config cache |
 | JWT verification fails | `ext-sodium` not enabled | Enable the PHP sodium extension in `php.ini` |
 
 ---

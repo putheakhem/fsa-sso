@@ -15,11 +15,7 @@ final class FsaSsoUserProvisioner
      */
     public function upsert(array $claims): Authenticatable
     {
-        $userModelClass = (string) config('fsa-sso.user_model');
-
-        if (! is_subclass_of($userModelClass, Model::class) || ! is_subclass_of($userModelClass, Authenticatable::class)) {
-            throw new FsaSsoTokenException('Configured FSA SSO user model is invalid.');
-        }
+        $userModelClass = $this->resolveUserModelClass();
 
         $sub = $claims['sub'] ?? null;
 
@@ -57,6 +53,35 @@ final class FsaSsoUserProvisioner
         $user->save();
 
         return $user;
+    }
+
+    private function resolveUserModelClass(): string
+    {
+        $configuredUserModelClass = trim((string) config('fsa-sso.user_model'));
+
+        if ($configuredUserModelClass === '') {
+            throw new FsaSsoTokenException('Configured FSA SSO user model is empty.');
+        }
+
+        $normalizedUserModelClass = ltrim(str_replace('\\\\', '\\', $configuredUserModelClass), '\\');
+
+        if (! class_exists($normalizedUserModelClass)) {
+            throw new FsaSsoTokenException(sprintf(
+                'Configured FSA SSO user model class was not found: %s',
+                $configuredUserModelClass,
+            ));
+        }
+
+        if (! is_subclass_of($normalizedUserModelClass, Model::class) || ! is_subclass_of($normalizedUserModelClass, Authenticatable::class)) {
+            throw new FsaSsoTokenException(sprintf(
+                'Configured FSA SSO user model must extend %s and implement %s: %s',
+                Model::class,
+                Authenticatable::class,
+                $configuredUserModelClass,
+            ));
+        }
+
+        return $normalizedUserModelClass;
     }
 
     private function nullableString(mixed $value): ?string
