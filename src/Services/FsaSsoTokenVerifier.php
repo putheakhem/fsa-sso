@@ -77,7 +77,7 @@ final class FsaSsoTokenVerifier
     private function base64UrlDecode(string $value): string
     {
         $base64 = strtr($value, '-_', '+/');
-        $remainder = strlen($base64) % 4;
+        $remainder = mb_strlen($base64) % 4;
 
         if ($remainder > 0) {
             $base64 .= str_repeat('=', 4 - $remainder);

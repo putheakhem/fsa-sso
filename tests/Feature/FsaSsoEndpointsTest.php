@@ -9,7 +9,7 @@ use PutheaKhem\FsaSso\Tests\TestUser;
 
 function base64UrlEncode(string $value): string
 {
-    return rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
+    return mb_rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
 }
 
 /**

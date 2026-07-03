@@ -16,8 +16,8 @@ $middleware = array_values(array_filter(array_merge(
 Route::middleware($middleware)
     ->prefix((string) config('fsa-sso.route_prefix', 'auth/sso'))
     ->group(function (): void {
-    Route::get('/initiate', SsoInitiateController::class)->name('fsa-sso.initiate');
-    Route::post('/verify', SsoVerifyController::class)->name('fsa-sso.verify');
-    Route::post('/introspect', SsoIntrospectController::class)->name('fsa-sso.introspect');
-    Route::post('/revoke', SsoRevokeController::class)->name('fsa-sso.revoke');
-});
+        Route::get('/initiate', SsoInitiateController::class)->name('fsa-sso.initiate');
+        Route::post('/verify', SsoVerifyController::class)->name('fsa-sso.verify');
+        Route::post('/introspect', SsoIntrospectController::class)->name('fsa-sso.introspect');
+        Route::post('/revoke', SsoRevokeController::class)->name('fsa-sso.revoke');
+    });

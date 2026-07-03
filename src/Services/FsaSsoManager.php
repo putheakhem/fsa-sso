@@ -21,7 +21,7 @@ final class FsaSsoManager
      */
     public function getLoginUrl(): array
     {
-        $frontendUrl = rtrim((string) config('fsa-sso.frontend_url'), '/');
+        $frontendUrl = mb_rtrim((string) config('fsa-sso.frontend_url'), '/');
         $clientCode = (string) config('fsa-sso.client_code');
 
         return [
@@ -59,7 +59,7 @@ final class FsaSsoManager
      */
     public function introspect(string $token): array
     {
-        $baseUrl = rtrim((string) config('fsa-sso.api_base_url'), '/');
+        $baseUrl = mb_rtrim((string) config('fsa-sso.api_base_url'), '/');
 
         $response = Http::acceptJson()
             ->timeout(10)
@@ -81,7 +81,7 @@ final class FsaSsoManager
      */
     public function revoke(string $token): void
     {
-        $baseUrl = rtrim((string) config('fsa-sso.api_base_url'), '/');
+        $baseUrl = mb_rtrim((string) config('fsa-sso.api_base_url'), '/');
 
         Http::acceptJson()
             ->timeout(10)

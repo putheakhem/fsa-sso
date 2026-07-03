@@ -14,9 +14,9 @@ $middleware = array_values(array_filter(array_merge(
     (array) config('fsa-sso.web_route_middleware', ['web']),
     [(string) config('fsa-sso.web_throttle_middleware', 'throttle:30,1')],
 ), static fn (mixed $value): bool => is_string($value) && $value !== ''));
-$loginPath = ltrim((string) config('fsa-sso.web_login_path', 'fsa-sso/loginUrl'), '/');
-$callbackPath = ltrim((string) config('fsa-sso.web_callback_path', 'sso/callback-success'), '/');
-$fallbackCallbackPath = ltrim((string) config('fsa-sso.web_fallback_callback_path', 'fsa-sso/callback'), '/');
+$loginPath = mb_ltrim((string) config('fsa-sso.web_login_path', 'fsa-sso/loginUrl'), '/');
+$callbackPath = mb_ltrim((string) config('fsa-sso.web_callback_path', 'sso/callback-success'), '/');
+$fallbackCallbackPath = mb_ltrim((string) config('fsa-sso.web_fallback_callback_path', 'fsa-sso/callback'), '/');
 $loginRouteName = (string) config('fsa-sso.web_login_route_name', 'fsaSsoLoginUrl');
 $callbackRouteName = (string) config('fsa-sso.web_callback_route_name', 'fsaSsoCallbackSuccess');
 $fallbackCallbackRouteName = (string) config('fsa-sso.web_fallback_callback_route_name', 'fsaSsoCallback');

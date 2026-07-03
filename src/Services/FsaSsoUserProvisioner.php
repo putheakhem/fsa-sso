@@ -57,13 +57,13 @@ final class FsaSsoUserProvisioner
 
     private function resolveUserModelClass(): string
     {
-        $configuredUserModelClass = trim((string) config('fsa-sso.user_model'));
+        $configuredUserModelClass = mb_trim((string) config('fsa-sso.user_model'));
 
         if ($configuredUserModelClass === '') {
             throw new FsaSsoTokenException('Configured FSA SSO user model is empty.');
         }
 
-        $normalizedUserModelClass = ltrim(str_replace('\\\\', '\\', $configuredUserModelClass), '\\');
+        $normalizedUserModelClass = mb_ltrim(str_replace('\\\\', '\\', $configuredUserModelClass), '\\');
 
         if (! class_exists($normalizedUserModelClass)) {
             throw new FsaSsoTokenException(sprintf(
@@ -86,7 +86,7 @@ final class FsaSsoUserProvisioner
 
     private function nullableString(mixed $value): ?string
     {
-        if (! is_string($value) || trim($value) === '') {
+        if (! is_string($value) || mb_trim($value) === '') {
             return null;
         }
 

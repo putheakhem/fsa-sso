@@ -10,8 +10,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 use PutheaKhem\FsaSso\Exceptions\FsaSsoTokenException;
-use Throwable;
 use PutheaKhem\FsaSso\Services\FsaSsoManager;
+use Throwable;
 
 final class SsoWebCallbackController
 {
