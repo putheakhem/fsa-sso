@@ -21,6 +21,7 @@ A Laravel package for **FSA SSO authentication** with support for JWT verificati
 - Registers a `fsa-sso.auth` middleware for per-request bearer token protection
 - Registers an opt-in `fsa-sso-api` auth driver for API bearer authentication
 - Registers package-managed web routes for browser login redirect and callback
+- Keeps host-app `auth:api` / Laravel Passport separate from package-owned `auth:fsa-sso-api`
 
 ---
 
@@ -95,10 +96,12 @@ FSA_SSO_WEB_FAILURE_REDIRECT=/login
 
 # Optional API bearer authentication
 FSA_SSO_API_AUTH_ENABLED=true
+FSA_SSO_API_AUTH_MODE=jwt
 FSA_SSO_ALLOWED_CLIENT_CODES=FSA-DPS-CODE
 FSA_SSO_AUTO_CREATE_USERS=true
 FSA_SSO_DEFAULT_API_ROLE=external-api-user
 FSA_SSO_JWKS_CACHE_SECONDS=600
+FSA_SSO_API_AUTH_DEBUG_LOGGING=false
 FSA_SSO_USE_INTROSPECTION=false
 FSA_SSO_INTROSPECTION_URL=https://sso.fsa.gov.kh/api/v1/auth/introspect
 FSA_SSO_INTROSPECTION_CACHE_SECONDS=120
@@ -142,6 +145,8 @@ protected $fillable = [
 
 FSA SSO authenticates the user's identity. The consuming Laravel application still owns authorization, roles, policies, and permissions.
 
+The package only owns the `fsa-sso-api` guard and related middleware. It does not replace or modify a host application's `api` guard, Laravel Passport configuration, or internal `auth:api` routes.
+
 Use the new opt-in guard when another FSA system calls your Laravel API with an existing FSA SSO JWT:
 
 ```http
@@ -158,14 +163,85 @@ FSA_SSO_ISSUER=https://sso.fsa.gov.kh
 FSA_SSO_AUDIENCE=https://sso.fsa.gov.kh
 
 FSA_SSO_API_AUTH_ENABLED=true
+FSA_SSO_API_AUTH_MODE=jwt
 FSA_SSO_ALLOWED_CLIENT_CODES=FSA-DPS-CODE
 FSA_SSO_AUTO_CREATE_USERS=true
 FSA_SSO_DEFAULT_API_ROLE=external-api-user
+FSA_SSO_API_AUTH_DEBUG_LOGGING=false
 
 FSA_SSO_USE_INTROSPECTION=false
 FSA_SSO_INTROSPECTION_URL=https://sso.fsa.gov.kh/api/v1/auth/introspect
 FSA_SSO_INTROSPECTION_CACHE_SECONDS=120
 ```
+
+### Auth Modes
+
+`jwt` is the default mode. It preserves the current behavior:
+
+- bearer token is decoded locally
+- `EdDSA` / JWKS verification is enforced
+- configured claims are validated before local user resolution
+
+```env
+FSA_SSO_API_AUTH_MODE=jwt
+```
+
+`introspection` is opt-in. Use it when the upstream token is opaque or when the upstream claim shape is not a locally verifiable JWT:
+
+- bearer token is accepted as-is
+- the package calls the configured introspection endpoint
+- authentication succeeds only when `active=true`
+- the introspection payload is mapped into `FsaSsoUserData` and resolved through the same local user flow
+
+```env
+FSA_SSO_API_AUTH_MODE=introspection
+FSA_SSO_INTROSPECTION_URL=https://sso.fsa.gov.kh/api/v1/auth/introspect
+```
+
+For older installs, `FSA_SSO_USE_INTROSPECTION=true` still maps to `introspection` mode when `FSA_SSO_API_AUTH_MODE` is not set.
+
+### Debug Logging
+
+When the application is not running in production, auth rejections are logged with a structured reason and a SHA-256 token hash. Production logging stays off unless you opt in:
+
+```env
+FSA_SSO_API_AUTH_DEBUG_LOGGING=true
+```
+
+The package never logs the raw bearer token. Typical reasons include malformed token, unsupported algorithm, JWKS fetch failure, key parse failure, issuer mismatch, audience mismatch, missing required claim, inactive token, and user resolution failure.
+
+### Claim Mapping
+
+Claim names are configurable per auth mode consumer. The defaults match the current package behavior exactly:
+
+```php
+'api_auth' => [
+    'claims' => [
+        'sub' => 'sub',
+        'client_code' => 'client_code',
+        'jti' => 'jti',
+        'iss' => 'iss',
+        'aud' => 'aud',
+        'iat' => 'iat',
+        'exp' => 'exp',
+        'email' => 'email',
+        'name' => 'name',
+        'provider' => 'provider',
+        'kyc_level' => 'kyc_level',
+        'e_kyc' => 'e_kyc',
+        'camdigikey_id' => 'camdigikey_id',
+        'nbfs_id' => 'nbfs_id',
+        'roles' => 'roles',
+    ],
+],
+```
+
+This is useful when introspection responses or partner-issued payloads use different field names while you still want the guard to populate:
+
+- `fsa_sso_user`
+- `fsa_sso_client_code`
+- `fsa_sso_jti`
+- `fsa_sso_token_hash`
 
 ### Guard Registration
 
@@ -203,6 +279,8 @@ Route::middleware([
     'fsa-sso.introspect',
 ])->get('/api/v1/integrations/sensitive-data', SensitiveDataController::class);
 ```
+
+The optional `fsa-sso.introspect` middleware remains compatible in both auth modes. In `jwt` mode it adds an active-token check after local verification. In `introspection` mode it reuses the same introspection endpoint and cache strategy as the guard.
 
 ### Migration Example
 
@@ -452,8 +530,18 @@ All options are in `config/fsa-sso.php` after publishing:
 | `jwks_cache_ttl_seconds` | `600` | JWKS cache duration in seconds |
 | `user_model` | `App\Models\User` | User model to upsert |
 | `columns` | *see config* | Maps JWT claims → user column names |
+| `api_auth.mode` | `jwt` | Guard auth mode: `jwt` or `introspection` |
+| `api_auth.debug_logging` | `false` | Force structured auth failure logs in production |
+| `api_auth.claims` | *see config* | Claim-name map used by the `fsa-sso-api` guard |
 | `return_access_token` | `false` | Include raw token in verify response |
 | `include_claims_in_response` | `true` | Include JWT claims in verify response |
+
+## Backward Compatibility
+
+- Existing installs keep local `EdDSA` + JWKS verification by default.
+- Existing `auth:fsa-sso-api`, `fsa-sso.client-code`, and `fsa-sso.introspect` middleware usage remains valid.
+- Existing host-app Passport or `auth:api` behavior is not changed.
+- `FSA_SSO_USE_INTROSPECTION` is still honored as a fallback for older configurations, but `FSA_SSO_API_AUTH_MODE` is the preferred setting going forward.
 
 ---
 

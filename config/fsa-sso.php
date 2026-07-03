@@ -47,6 +47,13 @@ return [
 
         'guard' => 'fsa-sso-api',
 
+        'mode' => env(
+            'FSA_SSO_API_AUTH_MODE',
+            env('FSA_SSO_USE_INTROSPECTION', false) ? 'introspection' : 'jwt'
+        ),
+
+        'debug_logging' => (bool) env('FSA_SSO_API_AUTH_DEBUG_LOGGING', false),
+
         'allowed_client_codes' => array_values(array_filter(array_map(
             'trim',
             explode(',', (string) env('FSA_SSO_ALLOWED_CLIENT_CODES', ''))
@@ -66,6 +73,24 @@ return [
         ),
 
         'introspection_cache_seconds' => env('FSA_SSO_INTROSPECTION_CACHE_SECONDS', 120),
+
+        'claims' => [
+            'sub' => 'sub',
+            'client_code' => 'client_code',
+            'jti' => 'jti',
+            'iss' => 'iss',
+            'aud' => 'aud',
+            'iat' => 'iat',
+            'exp' => 'exp',
+            'email' => 'email',
+            'name' => 'name',
+            'provider' => 'provider',
+            'kyc_level' => 'kyc_level',
+            'e_kyc' => 'e_kyc',
+            'camdigikey_id' => 'camdigikey_id',
+            'nbfs_id' => 'nbfs_id',
+            'roles' => 'roles',
+        ],
     ],
 
     'return_access_token' => (bool) env('FSA_SSO_RETURN_ACCESS_TOKEN', false),

@@ -9,8 +9,14 @@ use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
 use PutheaKhem\FsaSso\Auth\FsaSsoApiGuard;
+use PutheaKhem\FsaSso\Auth\FsaSsoAuthFailureLogger;
+use PutheaKhem\FsaSso\Auth\FsaSsoClaimMapper;
+use PutheaKhem\FsaSso\Auth\FsaSsoTokenIntrospector;
 use PutheaKhem\FsaSso\Auth\FsaSsoTokenValidator;
+use PutheaKhem\FsaSso\Auth\FsaSsoTokenValidatorInterface;
 use PutheaKhem\FsaSso\Auth\FsaSsoUserResolver;
+use PutheaKhem\FsaSso\Auth\EdDsaJwtTokenValidator;
+use PutheaKhem\FsaSso\Auth\IntrospectionTokenValidator;
 use PutheaKhem\FsaSso\Http\Middleware\AuthenticateFsaSsoToken;
 use PutheaKhem\FsaSso\Http\Middleware\EnsureFsaSsoClientCode;
 use PutheaKhem\FsaSso\Http\Middleware\EnsureFsaSsoTokenIsActive;
@@ -27,7 +33,23 @@ final class FsaSsoServiceProvider extends ServiceProvider
 
         $this->app->singleton(FsaSsoTokenVerifier::class, fn () => new FsaSsoTokenVerifier());
         $this->app->singleton(FsaSsoUserProvisioner::class, fn () => new FsaSsoUserProvisioner());
-        $this->app->singleton(FsaSsoTokenValidator::class, fn () => new FsaSsoTokenValidator());
+        $this->app->singleton(FsaSsoAuthFailureLogger::class, fn () => new FsaSsoAuthFailureLogger());
+        $this->app->singleton(FsaSsoClaimMapper::class, fn () => new FsaSsoClaimMapper());
+        $this->app->singleton(FsaSsoTokenIntrospector::class, fn ($app) => new FsaSsoTokenIntrospector(
+            $app->make(FsaSsoClaimMapper::class),
+        ));
+        $this->app->singleton(EdDsaJwtTokenValidator::class, fn ($app) => new EdDsaJwtTokenValidator(
+            $app->make(FsaSsoClaimMapper::class),
+        ));
+        $this->app->singleton(IntrospectionTokenValidator::class, fn ($app) => new IntrospectionTokenValidator(
+            $app->make(FsaSsoTokenIntrospector::class),
+            $app->make(FsaSsoClaimMapper::class),
+        ));
+        $this->app->singleton(FsaSsoTokenValidator::class, fn ($app) => new FsaSsoTokenValidator(
+            $app->make(EdDsaJwtTokenValidator::class),
+            $app->make(IntrospectionTokenValidator::class),
+        ));
+        $this->app->singleton(FsaSsoTokenValidatorInterface::class, fn ($app) => $app->make(FsaSsoTokenValidator::class));
         $this->app->singleton(FsaSsoUserResolver::class, fn () => new FsaSsoUserResolver());
 
         $this->app->singleton(FsaSsoManager::class, fn ($app) => new FsaSsoManager(
@@ -41,8 +63,9 @@ final class FsaSsoServiceProvider extends ServiceProvider
         Auth::extend('fsa-sso-api', function (Application $app, string $name, array $config): FsaSsoApiGuard {
             return new FsaSsoApiGuard(
                 request: $app['request'],
-                validator: $app->make(FsaSsoTokenValidator::class),
+                validator: $app->make(FsaSsoTokenValidatorInterface::class),
                 resolver: $app->make(FsaSsoUserResolver::class),
+                authFailureLogger: $app->make(FsaSsoAuthFailureLogger::class),
             );
         });
 

@@ -18,8 +18,9 @@ final class FsaSsoApiGuard implements Guard
 
     public function __construct(
         private Request $request,
-        private FsaSsoTokenValidator $validator,
+        private FsaSsoTokenValidatorInterface $validator,
         private FsaSsoUserResolver $resolver,
+        private FsaSsoAuthFailureLogger $authFailureLogger,
     ) {}
 
     public function check(): bool
@@ -50,12 +51,26 @@ final class FsaSsoApiGuard implements Guard
             return null;
         }
 
+        $validated = false;
+
         try {
             $fsaSsoUserData = $this->validator->validate($token);
+            $validated = true;
             $this->storeRequestAttributes($token, $fsaSsoUserData);
             $this->user = $this->resolver->resolve($fsaSsoUserData);
-        } catch (Throwable) {
+        } catch (Throwable $exception) {
+            $this->authFailureLogger->logThrowable($exception, $token, [
+                'guard' => 'fsa-sso-api',
+                'path' => $this->request->path(),
+            ]);
             $this->user = null;
+        }
+
+        if ($validated && $this->user === null) {
+            $this->authFailureLogger->log('user_resolution_failure', $token, [
+                'guard' => 'fsa-sso-api',
+                'path' => $this->request->path(),
+            ]);
         }
 
         return $this->user;
@@ -76,9 +91,22 @@ final class FsaSsoApiGuard implements Guard
 
         try {
             $userData = $this->validator->validate($token);
+            $resolvedUser = $this->resolver->resolve($userData);
 
-            return $this->resolver->resolve($userData) !== null;
-        } catch (Throwable) {
+            if ($resolvedUser === null) {
+                $this->authFailureLogger->log('user_resolution_failure', $token, [
+                    'guard' => 'fsa-sso-api',
+                    'operation' => 'validate',
+                ]);
+            }
+
+            return $resolvedUser !== null;
+        } catch (Throwable $exception) {
+            $this->authFailureLogger->logThrowable($exception, $token, [
+                'guard' => 'fsa-sso-api',
+                'operation' => 'validate',
+            ]);
+
             return false;
         }
     }
