@@ -40,6 +40,11 @@ abstract class TestCase extends Orchestra
             'prefix' => '',
         ]);
 
+        $app['config']->set('auth.defaults.provider', 'users');
+        $app['config']->set('auth.providers.users', [
+            'driver' => 'eloquent',
+            'model' => TestUser::class,
+        ]);
         $app['config']->set('fsa-sso.user_model', TestUser::class);
         $app['config']->set('fsa-sso.route_middleware', []);
     }

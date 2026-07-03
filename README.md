@@ -19,6 +19,7 @@ A Laravel package for **FSA SSO authentication** with support for JWT verificati
 - Upserts local users by stable FSA `sub` claim
 - Proxies optional introspect and revoke calls to FSA API
 - Registers a `fsa-sso.auth` middleware for per-request bearer token protection
+- Registers an opt-in `fsa-sso-api` auth driver for API bearer authentication
 - Registers package-managed web routes for browser login redirect and callback
 
 ---
@@ -91,6 +92,16 @@ FSA_SSO_WEB_FALLBACK_CALLBACK_ROUTE_NAME=fsaSsoCallback
 FSA_SSO_WEB_GUARD=web
 FSA_SSO_WEB_INTENDED_ROUTE=dashboard
 FSA_SSO_WEB_FAILURE_REDIRECT=/login
+
+# Optional API bearer authentication
+FSA_SSO_API_AUTH_ENABLED=true
+FSA_SSO_ALLOWED_CLIENT_CODES=FSA-DPS-CODE
+FSA_SSO_AUTO_CREATE_USERS=true
+FSA_SSO_DEFAULT_API_ROLE=external-api-user
+FSA_SSO_JWKS_CACHE_SECONDS=600
+FSA_SSO_USE_INTROSPECTION=false
+FSA_SSO_INTROSPECTION_URL=https://sso.fsa.gov.kh/api/v1/auth/introspect
+FSA_SSO_INTROSPECTION_CACHE_SECONDS=120
 ```
 
 > ✅ `FSA_SSO_CLIENT_CODE` must exactly match the client code registered in the FSA SSO admin portal.
@@ -125,6 +136,87 @@ protected $fillable = [
     'camdigikey_id',
     'nbfs_id',
 ];
+```
+
+## API Bearer Authentication
+
+FSA SSO authenticates the user's identity. The consuming Laravel application still owns authorization, roles, policies, and permissions.
+
+Use the new opt-in guard when another FSA system calls your Laravel API with an existing FSA SSO JWT:
+
+```http
+Authorization: Bearer <FSA_SSO_JWT>
+```
+
+The package validates the bearer token through JWKS using `EdDSA`, resolves the local user from `sub`, and lets your application keep full control over authorization.
+
+### Environment
+
+```env
+FSA_SSO_JWKS_URL=https://sso.fsa.gov.kh/.well-known/jwks.json
+FSA_SSO_ISSUER=https://sso.fsa.gov.kh
+FSA_SSO_AUDIENCE=https://sso.fsa.gov.kh
+
+FSA_SSO_API_AUTH_ENABLED=true
+FSA_SSO_ALLOWED_CLIENT_CODES=FSA-DPS-CODE
+FSA_SSO_AUTO_CREATE_USERS=true
+FSA_SSO_DEFAULT_API_ROLE=external-api-user
+
+FSA_SSO_USE_INTROSPECTION=false
+FSA_SSO_INTROSPECTION_URL=https://sso.fsa.gov.kh/api/v1/auth/introspect
+FSA_SSO_INTROSPECTION_CACHE_SECONDS=120
+```
+
+### Guard Registration
+
+The package registers the `fsa-sso-api` driver. If you prefer to declare the guard explicitly in your application, use:
+
+```php
+'guards' => [
+    'fsa-sso-api' => [
+        'driver' => 'fsa-sso-api',
+        'provider' => 'users',
+    ],
+],
+```
+
+### Route Examples
+
+```php
+Route::prefix('api/v1/integrations')
+    ->middleware([
+        'auth:fsa-sso-api',
+        'fsa-sso.client-code:FSA-DPS-CODE',
+        'permission:compendium.integration.read',
+    ])
+    ->group(function () {
+        Route::get('/regulators', RegulatorIntegrationController::class);
+    });
+```
+
+Sensitive endpoints can also confirm `active=true` through introspection:
+
+```php
+Route::middleware([
+    'auth:fsa-sso-api',
+    'fsa-sso.client-code:FSA-DPS-CODE',
+    'fsa-sso.introspect',
+])->get('/api/v1/integrations/sensitive-data', SensitiveDataController::class);
+```
+
+### Migration Example
+
+```php
+Schema::table('users', function (Blueprint $table) {
+    $table->string('sso_id')->nullable()->unique();
+    $table->string('sso_provider')->nullable();
+    $table->string('kyc_level')->nullable();
+    $table->string('camdigikey_id')->nullable()->unique();
+    $table->string('nbfs_id')->nullable()->unique();
+    $table->timestamp('last_sso_login_at')->nullable();
+
+    $table->string('password')->nullable()->change();
+});
 ```
 
 ---

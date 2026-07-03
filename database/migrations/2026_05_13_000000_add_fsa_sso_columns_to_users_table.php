@@ -37,6 +37,10 @@ return new class extends Migration
             if (! Schema::hasColumn('users', 'nbfs_id')) {
                 $table->string('nbfs_id', 50)->nullable()->unique();
             }
+
+            if (! Schema::hasColumn('users', 'last_sso_login_at')) {
+                $table->timestamp('last_sso_login_at')->nullable();
+            }
         });
     }
 
@@ -64,6 +68,10 @@ return new class extends Migration
             if (Schema::hasColumn('users', 'sso_id')) {
                 $table->dropUnique(['sso_id']);
                 $table->dropColumn('sso_id');
+            }
+
+            if (Schema::hasColumn('users', 'last_sso_login_at')) {
+                $table->dropColumn('last_sso_login_at');
             }
         });
     }

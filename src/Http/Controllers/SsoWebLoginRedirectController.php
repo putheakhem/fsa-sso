@@ -15,11 +15,6 @@ final class SsoWebLoginRedirectController
     {
         $response = $this->manager->getLoginUrl();
 
-        if (! isset($response['loginUrl']) || ! is_string($response['loginUrl'])) {
-            return redirect((string) config('fsa-sso.web_failure_redirect', '/login'))
-                ->with('error', 'Could not get FSA SSO login URL.');
-        }
-
         return redirect()->away($response['loginUrl']);
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PutheaKhem\FsaSso\Http\Controllers;
 
+use Illuminate\Contracts\Auth\StatefulGuard;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -27,13 +28,14 @@ final class SsoWebCallbackController
 
         try {
             $result = $this->manager->verifyAndProvision($token);
-            $user = $result['user'] ?? null;
+            $user = $result['user'];
+            $guard = Auth::guard((string) config('fsa-sso.web_guard', 'web'));
 
-            if ($user === null) {
-                return $this->failureResponse($request, 'User provisioning failed', 422);
+            if (! $guard instanceof StatefulGuard) {
+                return $this->failureResponse($request, 'Authentication guard is not stateful', 500);
             }
 
-            Auth::guard((string) config('fsa-sso.web_guard', 'web'))->login($user, remember: true);
+            $guard->login($user, remember: true);
             $request->session()->regenerate();
 
             $intendedRoute = (string) config('fsa-sso.web_intended_route', 'dashboard');

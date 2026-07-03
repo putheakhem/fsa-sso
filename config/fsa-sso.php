@@ -39,6 +39,33 @@ return [
         'kyc_level' => 'kyc_level',
         'camdigikey_id' => 'camdigikey_id',
         'nbfs_id' => 'nbfs_id',
+        'last_sso_login_at' => 'last_sso_login_at',
+    ],
+
+    'api_auth' => [
+        'enabled' => env('FSA_SSO_API_AUTH_ENABLED', true),
+
+        'guard' => 'fsa-sso-api',
+
+        'allowed_client_codes' => array_values(array_filter(array_map(
+            'trim',
+            explode(',', (string) env('FSA_SSO_ALLOWED_CLIENT_CODES', ''))
+        ))),
+
+        'auto_create_users' => env('FSA_SSO_AUTO_CREATE_USERS', true),
+
+        'default_role' => env('FSA_SSO_DEFAULT_API_ROLE', 'external-api-user'),
+
+        'jwks_cache_seconds' => env('FSA_SSO_JWKS_CACHE_SECONDS', 600),
+
+        'use_introspection' => env('FSA_SSO_USE_INTROSPECTION', false),
+
+        'introspection_url' => env(
+            'FSA_SSO_INTROSPECTION_URL',
+            'https://sso.fsa.gov.kh/api/v1/auth/introspect'
+        ),
+
+        'introspection_cache_seconds' => env('FSA_SSO_INTROSPECTION_CACHE_SECONDS', 120),
     ],
 
     'return_access_token' => (bool) env('FSA_SSO_RETURN_ACCESS_TOKEN', false),
