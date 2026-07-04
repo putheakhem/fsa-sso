@@ -22,6 +22,26 @@ use PutheaKhem\FsaSso\Http\Middleware\EnsureFsaSsoTokenIsActive;
 
 abstract class TestCase extends Orchestra
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->app->singleton(FsaSsoTokenValidatorInterface::class, fn ($app) => $app->make(FsaSsoTokenValidator::class));
+
+        Auth::extend('fsa-sso-api', function (Application $app, string $name, array $config): FsaSsoApiGuard {
+            return new FsaSsoApiGuard(
+                request: $app['request'],
+                validator: $app->make(FsaSsoTokenValidatorInterface::class),
+                resolver: $app->make(FsaSsoUserResolver::class),
+                authFailureLogger: $app->make(FsaSsoAuthFailureLogger::class),
+            );
+        });
+
+        Route::aliasMiddleware('fsa-sso.auth', AuthenticateFsaSsoToken::class);
+        Route::aliasMiddleware('fsa-sso.client-code', EnsureFsaSsoClientCode::class);
+        Route::aliasMiddleware('fsa-sso.introspect', EnsureFsaSsoTokenIsActive::class);
+    }
+
     protected function getPackageProviders($app): array
     {
         return [
@@ -50,6 +70,8 @@ abstract class TestCase extends Orchestra
             'database' => ':memory:',
             'prefix' => '',
         ]);
+        $app['config']->set('app.key', 'base64:3Q0SMg4ayxyV3u5Bop4PSJyYwcmBHQYaWV7k/akdLV0=');
+        $app['config']->set('app.cipher', 'AES-256-CBC');
 
         $app['config']->set('auth.defaults.provider', 'users');
         $app['config']->set('auth.providers.users', [
@@ -62,25 +84,5 @@ abstract class TestCase extends Orchestra
             'driver' => 'fsa-sso-api',
             'provider' => 'users',
         ]);
-    }
-
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-        $this->app->singleton(FsaSsoTokenValidatorInterface::class, fn ($app) => $app->make(FsaSsoTokenValidator::class));
-
-        Auth::extend('fsa-sso-api', function (Application $app, string $name, array $config): FsaSsoApiGuard {
-            return new FsaSsoApiGuard(
-                request: $app['request'],
-                validator: $app->make(FsaSsoTokenValidatorInterface::class),
-                resolver: $app->make(FsaSsoUserResolver::class),
-                authFailureLogger: $app->make(FsaSsoAuthFailureLogger::class),
-            );
-        });
-
-        Route::aliasMiddleware('fsa-sso.auth', AuthenticateFsaSsoToken::class);
-        Route::aliasMiddleware('fsa-sso.client-code', EnsureFsaSsoClientCode::class);
-        Route::aliasMiddleware('fsa-sso.introspect', EnsureFsaSsoTokenIsActive::class);
     }
 }

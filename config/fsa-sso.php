@@ -96,4 +96,13 @@ return [
     'return_access_token' => (bool) env('FSA_SSO_RETURN_ACCESS_TOKEN', false),
 
     'include_claims_in_response' => (bool) env('FSA_SSO_INCLUDE_CLAIMS_IN_RESPONSE', true),
+
+    'token_storage' => [
+        'enabled' => (bool) env('FSA_SSO_TOKEN_STORAGE_ENABLED', false),
+        'encrypted' => (bool) env('FSA_SSO_TOKEN_STORAGE_ENCRYPTED', true),
+        'token_column' => env('FSA_SSO_TOKEN_STORAGE_TOKEN_COLUMN', 'fsa_sso_access_token'),
+        'expires_at_column' => env('FSA_SSO_TOKEN_STORAGE_EXPIRES_AT_COLUMN', 'fsa_sso_token_expires_at'),
+        'client_code_column' => env('FSA_SSO_TOKEN_STORAGE_CLIENT_CODE_COLUMN', 'fsa_sso_token_client_code'),
+        'last_used_at_column' => env('FSA_SSO_TOKEN_STORAGE_LAST_USED_AT_COLUMN', 'fsa_sso_token_last_used_at'),
+    ],
 ];

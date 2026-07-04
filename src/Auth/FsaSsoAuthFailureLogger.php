@@ -6,7 +6,6 @@ namespace PutheaKhem\FsaSso\Auth;
 
 use Illuminate\Support\Facades\Log;
 use PutheaKhem\FsaSso\Exceptions\ExpiredFsaSsoTokenException;
-use PutheaKhem\FsaSso\Exceptions\InvalidFsaSsoTokenException;
 use PutheaKhem\FsaSso\Exceptions\MissingFsaSsoClaimException;
 use Throwable;
 

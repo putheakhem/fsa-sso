@@ -8,6 +8,7 @@ use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\ServiceProvider;
+use PutheaKhem\FsaSso\Auth\EdDsaJwtTokenValidator;
 use PutheaKhem\FsaSso\Auth\FsaSsoApiGuard;
 use PutheaKhem\FsaSso\Auth\FsaSsoAuthFailureLogger;
 use PutheaKhem\FsaSso\Auth\FsaSsoClaimMapper;
@@ -15,12 +16,12 @@ use PutheaKhem\FsaSso\Auth\FsaSsoTokenIntrospector;
 use PutheaKhem\FsaSso\Auth\FsaSsoTokenValidator;
 use PutheaKhem\FsaSso\Auth\FsaSsoTokenValidatorInterface;
 use PutheaKhem\FsaSso\Auth\FsaSsoUserResolver;
-use PutheaKhem\FsaSso\Auth\EdDsaJwtTokenValidator;
 use PutheaKhem\FsaSso\Auth\IntrospectionTokenValidator;
 use PutheaKhem\FsaSso\Http\Middleware\AuthenticateFsaSsoToken;
 use PutheaKhem\FsaSso\Http\Middleware\EnsureFsaSsoClientCode;
 use PutheaKhem\FsaSso\Http\Middleware\EnsureFsaSsoTokenIsActive;
 use PutheaKhem\FsaSso\Services\FsaSsoManager;
+use PutheaKhem\FsaSso\Services\FsaSsoStoredTokenManager;
 use PutheaKhem\FsaSso\Services\FsaSsoTokenVerifier;
 use PutheaKhem\FsaSso\Services\FsaSsoUserProvisioner;
 
@@ -33,6 +34,7 @@ final class FsaSsoServiceProvider extends ServiceProvider
 
         $this->app->singleton(FsaSsoTokenVerifier::class, fn () => new FsaSsoTokenVerifier());
         $this->app->singleton(FsaSsoUserProvisioner::class, fn () => new FsaSsoUserProvisioner());
+        $this->app->singleton(FsaSsoStoredTokenManager::class, fn () => new FsaSsoStoredTokenManager());
         $this->app->singleton(FsaSsoAuthFailureLogger::class, fn () => new FsaSsoAuthFailureLogger());
         $this->app->singleton(FsaSsoClaimMapper::class, fn () => new FsaSsoClaimMapper());
         $this->app->singleton(FsaSsoTokenIntrospector::class, fn ($app) => new FsaSsoTokenIntrospector(
@@ -55,6 +57,7 @@ final class FsaSsoServiceProvider extends ServiceProvider
         $this->app->singleton(FsaSsoManager::class, fn ($app) => new FsaSsoManager(
             $app->make(FsaSsoTokenVerifier::class),
             $app->make(FsaSsoUserProvisioner::class),
+            $app->make(FsaSsoStoredTokenManager::class),
         ));
     }
 
@@ -76,7 +79,11 @@ final class FsaSsoServiceProvider extends ServiceProvider
 
         $this->loadRoutesFrom(__DIR__.'/../routes/api.php');
         $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
-        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
+        $migrationPathsToLoad = $this->migrationPathsToLoad();
+
+        if ($migrationPathsToLoad !== []) {
+            $this->loadMigrationsFrom($migrationPathsToLoad);
+        }
 
         if ($this->app->runningInConsole()) {
             $publishableConfig = [
@@ -86,13 +93,12 @@ final class FsaSsoServiceProvider extends ServiceProvider
             $this->publishes($publishableConfig, 'fsa-sso-config');
             $this->publishes($publishableConfig, 'config');
 
-            $this->publishesMigrations([
-                __DIR__.'/../database/migrations' => database_path('migrations'),
-            ], 'fsa-sso-migrations');
+            $migrationPathsToPublish = $this->migrationPathsToPublish();
 
-            $this->publishesMigrations([
-                __DIR__.'/../database/migrations' => database_path('migrations'),
-            ], 'migrations');
+            if ($migrationPathsToPublish !== []) {
+                $this->publishes($migrationPathsToPublish, 'fsa-sso-migrations');
+                $this->publishes($migrationPathsToPublish, 'migrations');
+            }
         }
     }
 
@@ -110,5 +116,59 @@ final class FsaSsoServiceProvider extends ServiceProvider
             'driver' => 'fsa-sso-api',
             'provider' => $defaultProvider,
         ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function migrationPathsToLoad(): array
+    {
+        return array_values(array_filter(
+            $this->packageMigrationPaths(),
+            fn (string $path): bool => ! $this->migrationHasBeenPublished($path),
+        ));
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function migrationPathsToPublish(): array
+    {
+        $publishablePaths = [];
+        $publishedAt = now();
+
+        foreach ($this->migrationPathsToLoad() as $index => $path) {
+            $publishablePaths[$path] = database_path('migrations/'.$publishedAt->copy()->addSeconds($index)->format('Y_m_d_His').'_'.$this->migrationSuffix($path));
+        }
+
+        return $publishablePaths;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function packageMigrationPaths(): array
+    {
+        $paths = glob(__DIR__.'/../database/migrations/*.php');
+
+        if ($paths === false) {
+            return [];
+        }
+
+        sort($paths);
+
+        return $paths;
+    }
+
+    private function migrationHasBeenPublished(string $path): bool
+    {
+        return glob(database_path('migrations/*_'.$this->migrationSuffix($path))) !== [];
+    }
+
+    private function migrationSuffix(string $path): string
+    {
+        $filename = basename($path);
+
+        return preg_replace('/^\d{4}_\d{2}_\d{2}_\d{6}_/', '', $filename) ?? $filename;
     }
 }

@@ -7,6 +7,7 @@ namespace PutheaKhem\FsaSso\Services;
 use Exception;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 
 final class FsaSsoManager
@@ -14,6 +15,7 @@ final class FsaSsoManager
     public function __construct(
         private FsaSsoTokenVerifier $tokenVerifier,
         private FsaSsoUserProvisioner $userProvisioner,
+        private FsaSsoStoredTokenManager $storedTokenManager,
     ) {}
 
     /**
@@ -36,6 +38,7 @@ final class FsaSsoManager
     {
         $claims = $this->tokenVerifier->verify($authToken);
         $user = $this->userProvisioner->upsert($claims);
+        $this->storedTokenManager->persist($user, $authToken, $claims);
 
         $response = [
             'user' => $user,
@@ -50,6 +53,32 @@ final class FsaSsoManager
         }
 
         return $response;
+    }
+
+    public function storedTokenForUser(Authenticatable $user, bool $markAsUsed = false): ?string
+    {
+        return $this->storedTokenManager->get($user, $markAsUsed);
+    }
+
+    public function storedTokenForCurrentUser(?string $guard = null, bool $markAsUsed = false): ?string
+    {
+        $user = Auth::guard($guard)->user();
+
+        if (! $user instanceof Authenticatable) {
+            return null;
+        }
+
+        return $this->storedTokenManager->get($user, $markAsUsed);
+    }
+
+    public function storedTokenHasExpired(Authenticatable $user): bool
+    {
+        return $this->storedTokenManager->hasExpired($user);
+    }
+
+    public function markStoredTokenAsUsed(Authenticatable $user): void
+    {
+        $this->storedTokenManager->markAsUsed($user);
     }
 
     /**

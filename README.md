@@ -81,6 +81,12 @@ FSA_SSO_JWKS_CACHE_TTL_SECONDS=600
 FSA_SSO_RETURN_ACCESS_TOKEN=false
 FSA_SSO_INCLUDE_CLAIMS_IN_RESPONSE=true
 FSA_SSO_USER_MODEL=App\Models\User
+FSA_SSO_TOKEN_STORAGE_ENABLED=false
+FSA_SSO_TOKEN_STORAGE_ENCRYPTED=true
+FSA_SSO_TOKEN_STORAGE_TOKEN_COLUMN=fsa_sso_access_token
+FSA_SSO_TOKEN_STORAGE_EXPIRES_AT_COLUMN=fsa_sso_token_expires_at
+FSA_SSO_TOKEN_STORAGE_CLIENT_CODE_COLUMN=fsa_sso_token_client_code
+FSA_SSO_TOKEN_STORAGE_LAST_USED_AT_COLUMN=fsa_sso_token_last_used_at
 
 # Optional package-managed web flow
 FSA_SSO_ENABLE_WEB_ROUTES=true
@@ -140,6 +146,78 @@ protected $fillable = [
     'nbfs_id',
 ];
 ```
+
+If you enable shared token storage, publish the latest package migration and migrate so the default storage columns are available:
+
+```bash
+php artisan vendor:publish --provider="PutheaKhem\\FsaSso\\FsaSsoServiceProvider" --tag=fsa-sso-migrations
+php artisan migrate
+```
+
+The default migration adds:
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `fsa_sso_access_token` | text, nullable | Raw FSA token, encrypted by the package when enabled |
+| `fsa_sso_token_expires_at` | timestamp, nullable | Derived from JWT `exp` |
+| `fsa_sso_token_client_code` | string, nullable | Client code from verified claims |
+| `fsa_sso_token_last_used_at` | timestamp, nullable | Updated when the host app marks token usage |
+
+If you want different column names, create your own migration and set the `token_storage.*_column` config values to match.
+
+## Design A: Shared FSA token for trusted downstream resource access
+
+This package now supports an optional Design A integration pattern where a portal such as DPS stores the verified FSA SSO token and later reuses that same token when calling another trusted resource server such as Compendium.
+
+- This is a trusted downstream resource-access pattern, not a token exchange flow.
+- `client_code` still matters. Each downstream service can continue validating trusted callers through the verified FSA token claims it already receives.
+- Authentication comes from FSA SSO, but authorization remains local to each portal or service.
+- The package does not automatically forward tokens anywhere. It only offers opt-in storage and retrieval so the host application decides when a downstream call is appropriate.
+- The feature is disabled by default and only activates when `FSA_SSO_TOKEN_STORAGE_ENABLED=true`.
+
+### How it works
+
+1. User authenticates with FSA SSO and the package verifies the returned JWT via JWKS.
+2. The package keeps user identity mapping based on `sub`, exactly as before.
+3. If `token_storage.enabled` is true, the package stores the raw token plus metadata on the user record.
+4. Later, the host app can retrieve the stored token and attach it to an outbound request to a trusted downstream portal or service.
+
+### Retrieving the stored token
+
+You can retrieve the current authenticated user token:
+
+```php
+use PutheaKhem\FsaSso\Facades\FsaSso;
+
+$token = FsaSso::storedTokenForCurrentUser(markAsUsed: true);
+```
+
+Or retrieve it for a specific user model:
+
+```php
+use PutheaKhem\FsaSso\Facades\FsaSso;
+
+$token = FsaSso::storedTokenForUser($user, markAsUsed: true);
+
+if ($token !== null && ! FsaSso::storedTokenHasExpired($user)) {
+    // Host application decides whether to send the token downstream.
+}
+```
+
+### Token storage config
+
+```php
+'token_storage' => [
+    'enabled' => false,
+    'encrypted' => true,
+    'token_column' => 'fsa_sso_access_token',
+    'expires_at_column' => 'fsa_sso_token_expires_at',
+    'client_code_column' => 'fsa_sso_token_client_code',
+    'last_used_at_column' => 'fsa_sso_token_last_used_at',
+],
+```
+
+When `encrypted` is true, the package uses Laravel encryption before persisting the token. That keeps storage secure even if your `User` model does not define an encrypted cast for the token column.
 
 ## API Bearer Authentication
 
