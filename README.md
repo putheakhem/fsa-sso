@@ -60,6 +60,68 @@ The package also registers conventional `config` and `migrations` tags for compa
 
 ---
 
+## 🚀 Choose Your Integration Path
+
+This package supports two main integration styles. Start with the one you actually need:
+
+### Option A — Web Login for Browser Users
+
+Use this when users click a "Sign in with FSA SSO" button in your Laravel web app and should end up logged into your local `web` guard session.
+
+You need:
+
+- published config
+- published migrations
+- `FSA_SSO_CLIENT_CODE`
+- `FSA_SSO_ENABLE_WEB_ROUTES=true`
+- callback URL registered in FSA admin
+
+Typical outcome:
+
+- browser redirects to FSA SSO
+- FSA redirects back to your app callback
+- package verifies token, provisions the user, logs them in, and redirects
+
+Jump to:
+
+- [Web Login Quick Start](#-web-login-quick-start)
+- [Integration Guide (Laravel + Inertia)](#-integration-guide-laravel--inertia)
+
+### Option B — API Authentication for Incoming Bearer Tokens
+
+Use this when another FSA-connected system calls your Laravel API with an existing FSA SSO bearer token and your routes should authenticate with `auth:fsa-sso-api`.
+
+You need:
+
+- published config
+- published migrations
+- `FSA_SSO_API_AUTH_ENABLED=true`
+- JWKS / issuer / audience values configured
+- protected routes using `auth:fsa-sso-api`
+
+Typical outcome:
+
+- client sends `Authorization: Bearer <token>`
+- package verifies the token in `jwt` mode or introspects it in `introspection` mode
+- your route receives an authenticated local user and request attributes
+
+Jump to:
+
+- [API Auth Quick Start](#-api-auth-quick-start)
+- [API Bearer Authentication](#api-bearer-authentication)
+
+### Optional Add-On — Shared Token Storage
+
+Enable this only if your app needs to store the verified FSA token for later trusted downstream calls.
+
+- set `FSA_SSO_TOKEN_STORAGE_ENABLED=true`
+- publish the latest package migrations
+- migrate your app so the token storage columns exist
+
+If you do not need downstream token reuse, leave token storage disabled.
+
+---
+
 ## 🌐 .env Configuration
 
 Add these to your `.env` file:
@@ -119,6 +181,77 @@ FSA_SSO_INTROSPECTION_CACHE_SECONDS=120
 
 ---
 
+## 🧭 Web Login Quick Start
+
+Minimum setup for browser-based login:
+
+1. Install the package.
+2. Publish config and migrations.
+3. Set these env values:
+
+```env
+FSA_SSO_FRONTEND_URL=https://sso.fsa.gov.kh
+FSA_SSO_JWKS_URL=https://sso.fsa.gov.kh/.well-known/jwks.json
+FSA_SSO_ISSUER=https://sso.fsa.gov.kh
+FSA_SSO_AUDIENCE=https://sso.fsa.gov.kh
+FSA_SSO_CLIENT_CODE=FSA-XXXXXXXXXXXX
+FSA_SSO_ENABLE_WEB_ROUTES=true
+FSA_SSO_WEB_CALLBACK_PATH=sso/callback-success
+FSA_SSO_WEB_INTENDED_ROUTE=dashboard
+```
+
+4. Register the exact callback URL in FSA admin:
+
+- `https://your-app.com/sso/callback-success`
+
+5. Add a login link or button to the package route:
+
+```php
+route('fsaSsoLoginUrl')
+```
+
+That is enough for the package-managed web flow. The package will redirect to FSA, verify the callback token, provision the user, log them into the configured `web` guard, and redirect them to your intended route.
+
+## 🔌 API Auth Quick Start
+
+Minimum setup for protecting API routes that receive FSA SSO bearer tokens:
+
+1. Install the package.
+2. Publish config and migrations.
+3. Set these env values:
+
+```env
+FSA_SSO_JWKS_URL=https://sso.fsa.gov.kh/.well-known/jwks.json
+FSA_SSO_ISSUER=https://sso.fsa.gov.kh
+FSA_SSO_AUDIENCE=https://sso.fsa.gov.kh
+FSA_SSO_API_AUTH_ENABLED=true
+FSA_SSO_API_AUTH_MODE=jwt
+FSA_SSO_ALLOWED_CLIENT_CODES=FSA-DPS-CODE
+```
+
+4. Protect routes with the package guard:
+
+```php
+Route::middleware(['auth:fsa-sso-api'])->group(function () {
+    // protected routes
+});
+```
+
+5. Add optional client-code restriction when needed:
+
+```php
+Route::middleware([
+    'auth:fsa-sso-api',
+    'fsa-sso.client-code:FSA-DPS-CODE',
+])->group(function () {
+    // protected routes
+});
+```
+
+That is enough for the package to validate incoming bearer tokens and resolve a local user for your API routes.
+
+---
+
 ## 🗄️ User Model — Fillable & Migration
 
 The published migration adds these columns to your `users` table:
@@ -164,6 +297,14 @@ The default migration adds:
 | `fsa_sso_token_last_used_at` | timestamp, nullable | Updated when the host app marks token usage |
 
 If you want different column names, create your own migration and set the `token_storage.*_column` config values to match.
+
+### Migration Ownership Note
+
+This package auto-loads package migrations until matching published copies exist in the host application's `database/migrations` directory.
+
+- If you publish the package migrations, the published app copies become the migrations your app owns.
+- Do not keep two different migrations that add the same FSA SSO columns with different filenames.
+- If you customize the schema yourself, keep one clear owner for each column so rollback history stays consistent.
 
 ## Design A: Shared FSA token for trusted downstream resource access
 
